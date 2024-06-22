@@ -25,8 +25,8 @@ function init_script(){
   readonly ERR_ROOT_PRIV=52       # Root privileges required
 
   # Global variables
-  no_color="false"
   script_lock=""
+  no_color="false"
   noformat="\033[0;0m"
   red="\033[0;31m"
   green="\033[0;32m"
@@ -92,7 +92,6 @@ function parse_params() {
     case "${param}" in
       -h | --help)
         usage
-        exit_script 0
         ;;
       -n | --no-color)
         no_color="true"
@@ -139,17 +138,17 @@ function unset_colors() {
 ########################################
 function usage() {
 cat <<EOF
-Usage: ${SCRIPT_NAME} [-h] [-v]
+Usage: ${SCRIPT_NAME} [-h|--help] [-n|--no-color] [-v|--verbose]
 
 Updates installed packages after determining the distribution type.
 
 Available options:
-        -h, --help          Display help
-        -n | --no-color     Turn off text colors
-        -v, --verbose       Enable verbose mode
+        -h|--help          Display help
+        -n|--no-color     Turn off text colors
+        -v|--verbose       Enable verbose mode
 
 EOF
-  exit_script 0
+  exit_script 0 ""
 }
 
 ########################################
@@ -210,7 +209,7 @@ function main() {
   unset_colors 
   lock_script
   update_distro
-  exit 0
+  exit_script 0 ""
 }
 
 ########################################
