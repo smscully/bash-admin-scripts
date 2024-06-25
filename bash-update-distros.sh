@@ -138,6 +138,7 @@ function unset_colors() {
 ########################################
 function usage() {
 cat <<EOF
+
 Usage: ${SCRIPT_NAME} [-h|--help] [-n|--no-color] [-v|--verbose]
 
 Updates installed packages after determining the distribution type.
