@@ -101,7 +101,7 @@ function parse_params() {
         set -x
         ;;
       -*) 
-        exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param} Please use the -h option to view Help.${noformat}"
+        exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param}. Please use the -h option to view Help.${noformat}"
         ;;
     esac
   done
