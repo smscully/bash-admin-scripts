@@ -10,4 +10,3 @@ backup@10.0.2.6
 --SSH_KEY--
 /home/user01/.ssh/backup_key
 --EOF--
---EOF--
