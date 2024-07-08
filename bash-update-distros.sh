@@ -67,7 +67,7 @@ function cleanup_script(){
 # Exit script 
 # Arguments:
 #   $1 (required): Script-specific exit code
-#   $2 (optional): Message to print on exit
+#   $2 (required): Message to print on exit
 # Ouputs:
 #   If provided, writes exit message to stderr
 ########################################
