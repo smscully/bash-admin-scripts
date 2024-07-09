@@ -47,7 +47,7 @@ function init_script(){
 function lock_script() {
   local lock_dir="/tmp/${SCRIPT_NAME}.lock"
 
-  if mkdir "${lock_dir}"; then
+  if /usr/bin/mkdir "${lock_dir}"; then
     script_lock="${lock_dir}"
   else
     exit_script "${ERR_LOCK}" "${red}Script lock could not be acquired. Please close other instances of the script, then rerun.${noformat}"
@@ -64,7 +64,7 @@ function cleanup_script(){
   trap - SIGINT SIGTERM ERR EXIT
 
   if [[ -d "${script_lock}" ]]; then
-    rmdir "${script_lock}"
+    /usr/bin/rmdir "${script_lock}"
   fi 
 }
 
