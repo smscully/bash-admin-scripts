@@ -1,5 +1,5 @@
 # Update Installed Packages Based On Distribution
-The [bash-update-distros.sh](./bash-update-distros.sh) script determines the current distribution and runs the corresponding package manager update commands.
+The [update-distros.sh](./update-distros.sh) script determines the current distribution and runs the corresponding package manager update commands.
 
 ## Description
 Upon invocation, the script first initializes variables, checks for root privileges, and parses parameters. Next, the text colors are determined and a script lock is initiated. Finally, the `update_distro` function is called. 
@@ -27,13 +27,13 @@ If the script errors out on a Bash command, the command's exit code will return.
 **NOTE:** The script has been tested on numerous distributions, including Rocky, CentOS, Debian, Ubuntu, Mint, Arch, Kali, and openSUSE.
 
 ### Installation
-To install the script, clone the [bash-update-distros](.) repo or download the file to the local host. 
+To install the script, clone the [update-distros](.) repo or download the file to the local host. 
 
 ## Usage
 To run the script without any options, use the syntax below:
 
 ```bash
-sudo ./bash-update-distros.sh 
+sudo ./update-distros.sh 
 ```
 
 The following options are available:
@@ -45,4 +45,4 @@ The following options are available:
 |-v|--verbose|Enable verbose mode|
 
 ## License
-Licensed under the [GNU General Public License v3.0](./LICENSE).
+Licensed under the [GNU General Public License v3.0](../LICENSE).
