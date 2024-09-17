@@ -1,0 +1,12 @@
+--TAR_FILES--
+home/user01/Pictures
+home/user01/Documents/test.txt
+--SAVE_DIR_LOCAL--
+/home/user01/backup/
+--SAVE_DIR_REMOTE--
+/backup/user01/
+--SSH_SERVER--
+backup@10.0.2.6
+--SSH_KEY--
+/home/user01/.ssh/backup_key
+--EOF--
