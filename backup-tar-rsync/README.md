@@ -1,5 +1,5 @@
 # Backup Using Tar and Rsync
-The `bash-backup-tar-rsync.sh` script creates a gzip compressed tar archive of selected files and/or directories and uses `rsync` to copy the tar archive to a remote SSH server. The script supports daily, weekly, and monthly backups, which will typically be scheduled as `cron` jobs. One-time backups can be run on an ad hoc basis.
+The [backup-tar-rsync.sh](./backup-tar-rsync.sh) script creates a gzip compressed tar archive of selected files and/or directories and uses `rsync` to copy the tar archive to a remote SSH server. The script supports daily, weekly, and monthly backups, which will typically be scheduled as `cron` jobs. One-time backups can be run on an ad hoc basis.
 
 ## Description
 Upon invocation, the script initializes variables, parses parameters, and determines text color settings. The script then initiates a lock and calls the `backup` function. 
@@ -26,7 +26,7 @@ If the script errors out on a Bash command, the command's exit code will return.
 + SSH connection: The script uses `rsync` to transfer the tar archive from the local host to the remote SSH server, necessitating an SSH connection between the two.
 
 ### 1. Install the Script
-To install the script, clone the [bash-backup-tar-rsync](.) repo or download the script and settings file to the local host. As with all Bash scripts, the script can be saved to `usr/local/bin` for system-wide availability, although this is not required.
+To install the script, clone the [backup-tar-rsync](.) repo or download the script and settings file to the local host. As with all Bash scripts, the script can be saved to `usr/local/bin` for system-wide availability, although this is not required.
 
 ### 2. Create Backup Save Directories and Subdirectories
 On each of the local host and remote SSH server, create a save directory, which is where the tar archives will be saved. For simplicity, these can be identically named, but they need not be. For example:
@@ -72,7 +72,7 @@ backup@10.0.2.6
 --EOF--
 ```
 
-Each backup file or directory must be listed on a separate line. Additionally, the [backup.settings](./backup.settings) file must be stored in the same directory as the [bash-backup-tar-rsync.sh](./bash-backup-tar-rsync.sh) file.
+Each backup file or directory must be listed on a separate line. Additionally, the [backup.settings](./backup.settings) file must be stored in the same directory as the [backup-tar-rsync.sh](./backup-tar-rsync.sh) file.
 
 ### 5. Configure `cron` Jobs (Optional)
 While the script can be run on an ad hoc basis, the daily, weekly, and monthly options are designed to support a standard backup regimen using `cron` jobs. In this connection, the script deletes daily backups older than 7 days, weekly backups older than 30 days, and monthly backups older than 365 days.
@@ -80,7 +80,7 @@ While the script can be run on an ad hoc basis, the daily, weekly, and monthly o
 As an example, to schedule a weekly backup at 12:30 a.m. every Sunday, create the following `cron` entry:
 
 ```bash
-30 0 * * 0 /user/local/bin/bash-backup-tar-rsync -w
+30 0 * * 0 /user/local/bin/backup-tar-rsync -w
 ```
 
 ## Usage
@@ -99,7 +99,7 @@ The script requires at least one of the following options:
 Multiple options can be provided, such as a weekly backup in verbose mode:
 
 ```bash
-sudo ./bash-backup-tar-rsync.sh -w -v
+sudo ./backup-tar-rsync.sh -w -v
 ```
 However, please note the following caveats:
 
@@ -108,4 +108,4 @@ However, please note the following caveats:
 + The script will throw an error if neither a frequency option (-d, -m, -o, -w) nor the help option (-h) is provided.
 
 ## License
-Licensed under the [GNU General Public License v3.0](./LICENSE).
+Licensed under the [GNU General Public License v3.0](../LICENSE).
