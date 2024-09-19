@@ -1,7 +1,7 @@
 #!/bin/bash -i
 set -Eeuo pipefail
 
-# bash-update-distros.sh
+# update-distros.sh
 #
 # Updates installed packages after determining the current distribution.
 #

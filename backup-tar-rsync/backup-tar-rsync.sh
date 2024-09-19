@@ -1,7 +1,7 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-# bash-backup-tar-rsync.sh
+# backup-tar-rsync.sh
 #
 # Performs a backup using tar with gzip, then copies the tar archive to a remote server using rsync.
 # Reads a settings file to determine the backup files and/or directories, the local and remote save
