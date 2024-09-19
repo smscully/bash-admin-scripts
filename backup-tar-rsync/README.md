@@ -26,7 +26,7 @@ If the script errors out on a Bash command, the command's exit code will return.
 + SSH connection: The script uses `rsync` to transfer the tar archive from the local host to the remote SSH server, necessitating an SSH connection between the two.
 
 ### 1. Installation
-To install the script, clone the [bash-admin-scripts](..) repo or download the script and settings file to the local host. As with all Bash scripts, the script can be saved to `usr/local/bin` for system-wide availability, although this is not required.
+To install the script, either clone the [bash-admin-scripts](..) repo or download the [backup-tar-rsync.sh](./backup-tar-rsync.sh) and [backup.settings](./backup.settings) files to the local host. As with all Bash scripts, the script can be saved to `usr/local/bin` for system-wide availability, although this is not required.
 
 ### 2. Create Backup Save Directories and Subdirectories
 On each of the local host and remote SSH server, create a save directory, which is where the tar archives will be saved. For simplicity, these can be identically named, but they need not be. For example:

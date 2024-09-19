@@ -27,7 +27,7 @@ If the script errors out on a Bash command, the command's exit code will return.
 **NOTE:** The script has been tested on numerous distributions, including Rocky, CentOS, Debian, Ubuntu, Mint, Arch, Kali, and openSUSE.
 
 ### Installation
-To install the script, clone the [bash-admin-scripts](..) repo or download the script to the local host. As with all Bash scripts, the script can be saved to `usr/local/bin` for system-wide availability, although this is not required.
+To install the script, either clone the [bash-admin-scripts](..) repo or download the [update-distros.sh](./update-distros.sh) file to the local host. As with all Bash scripts, the script can be saved to `usr/local/bin` for system-wide availability, although this is not required.
 
 ## Usage
 To run the script without any options, use the syntax below:
