@@ -18,7 +18,7 @@ The Bash Builtins man page provides an in-depth explanation of these options, as
 All constants, exit codes, and global variables are initialized in the `init_script` function. This includes the color variables because the default state for text color is true.
 
 ### Locking the Script
-There are several methods to ensure only one instance of a script is running. (For a detailed explanation of the most common techniques, read [this article](https://www.baeldung.com/linux/bash-ensure-instance-running)). In the template, the `lock_script` function creates a temporary directory to indicate the script is in use, then removes the directory once the script completes.
+There are several methods to ensure only one instance of a script is running. (For a detailed explanation of the most common techniques, read [this article](https://www.baeldung.com/linux/bash-ensure-instance-running).) In the template, the `lock_script` function creates a temporary directory to indicate the script is in use, then removes the directory once the script completes.
 
 ### Performing Cleanup Tasks
 Upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function. For the template, the function simply deletes the directory created for the script lock. However, for complex scripts, additional tasks can be added, e.g. deleting temporary data files.
@@ -31,16 +31,18 @@ The `parse_params` function reads and processes script options. The function is 
 
 First, the function uses a conditional to check for the required number of parameters, exiting the function if the check fails. Note that the conditional can be removed if there is no explicit required number of parameters.
 
-Next, a `while` loop with a `shift` statement cycles through the parameters, using a `case` statement to read the option value and take appropriate actions, e.g. assign variables, call functions, or perform other tasks.
-
-If an invalid option is passed, the script exits with a message notifying as such.
+Next, a `while` loop with a `shift` statement cycles through the parameters, using a `case` statement to read the option value and take appropriate actions, e.g. assign variables, call functions, or perform other tasks. If an invalid option is passed, the script exits with a message notifying as such.
 
 Presently, the template parses options but not arguments. To modify the `parse_params` function to include arguments, review this [post](https://medium.com/@Drew_Stokes/bash-argument-parsing-54f3b81a6a8f) by Drew Stokes, which provides an excellent explanation of how to parse options with their arguments.
 
 ### Text Colors
 By default, text colors are set to true, as the `init_script` function assigns color variables and sets the global variable `no_color` to false. Running the script with the -n or --no-color option resets `no_color` to true, and the `unset_colors` function will then reset the color variables to null values.
 
-The `exit_script` function uses color to print an error message to stderr, when applicable. Color functionality, though, can be added to other print statements as needed.
+In the template, the only use of color is by the `exit_script` function, which prints color-formatted error messages to stderr. Color functionality, though, can be added to other print statements as needed. Doing so is as simple as adding a color tag (e.g., `${red}`) at the beginning of the text and a noformat tag (`${noformat}`) after the text. The following call to `exit_script` provides an example:
+
+```bash
+exit_script "${ERR_ROOT_PRIV}" "${red}Root privileges are required. Please run as root or with sudo.${noformat}"
+```
 
 ### Script Help
 Script help is encapsulated in the `usage` function. At a minimum, script help should provide usage instructions, a general description of the script, and a list of available options.
