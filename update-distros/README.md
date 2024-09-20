@@ -2,9 +2,7 @@
 The [update-distros.sh](./update-distros.sh) script determines the current distribution and runs the corresponding package manager update commands.
 
 ## Description
-Upon invocation, the script calls the `main` function, which first initializes variables, checks for root privileges, parses parameters, determines text color settings, and initiates a script lock.
-
-Next, the `update_distro` function is called, as described below.
+Upon invocation, the script calls the `main` function, which first initializes variables, checks for root privileges, parses parameters, determines text color settings, and initiates a script lock. Next, the `update_distro` function is called, as described below.
 
 ### Determining Distribution and Updating Installed Packages
 The `update_distro` function determines the distribution via a set of conditionals that test grep searches of the `/etc/os-release` file for distribution-specific keywords. Once a conditional returns true, the script runs the distribution-specific package manager update commands.
