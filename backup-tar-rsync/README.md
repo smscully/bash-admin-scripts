@@ -2,7 +2,9 @@
 The [backup-tar-rsync.sh](./backup-tar-rsync.sh) script creates a gzip compressed tar archive of selected files and/or directories and uses `rsync` to copy the tar archive to a remote SSH server. The script supports daily, weekly, and monthly backups, which will typically be scheduled as `cron` jobs. One-time backups can be run on an ad hoc basis.
 
 ## Description
-Upon invocation, the script initializes variables, parses parameters, and determines text color settings. The script then initiates a lock and calls the `backup` function. 
+Upon invocation, the script calls the `main` function, which first initializes variables, checks for root privileges, parses parameters, determines text color settings, and initiates a script lock.
+
+The script then calls the `backup` function, as described below.
 
 ### Creating the Archive, Deleting Old Archives, and Copying the Archive to the Remote SSH Server
 The `backup` function performs the primary work of the script. The function first reads the `backup.settings` file, which stores data regarding the backup files and/or directories, the local and remote save directories for the tar archive, the rsync remote SSH server (and port if non-standard), and the absolute path to local SSH key file. Thereafter, the function calls the `tar` command to create the archive with gzip compression, runs the `find` command to delete old archives, and copies the tar archive to the remote SSH server using `rsync`.
