@@ -51,7 +51,7 @@ Script help is encapsulated in the `usage` function. At a minimum, script help s
 If the script requires root privileges, ensure that the `main` function includes a call to the `check_root` function. The call, and indeed the function itself, can be removed when the script does not require root privileges.
 
 ### Generic Function Skeleton
-The generic function called `function_name` serves as skeleton to be customized as appropriate. It should be renamed as appropriate, and the header modified to reflect its global variables, arguments, outputs, and returns.
+The generic function called `function_name` serves as a skeleton that can be customized as needed. It should be renamed as appropriate, and the header modified to reflect its global variables, arguments, outputs, and returns.
 
 ### The `main` Function
 The logical flow of the script is contained within the `main` function, which makes calls to the other primary script functions. The last non-comment line of the script calls `main`. 
