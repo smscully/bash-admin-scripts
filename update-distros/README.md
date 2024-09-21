@@ -1,16 +1,31 @@
 # Update Installed Packages Based On Distribution
-The [update-distros.sh](./update-distros.sh) script determines the current distribution and runs the corresponding package manager update commands.
+The [update-distros.sh](./update-distros.sh) script determines the current distribution and runs the corresponding package manager update commands. The script requires root privileges.
 
 ## Description
-Upon invocation, the script calls the `main` function, which first initializes variables, checks for root privileges, parses parameters, determines text color settings, and initiates a script lock. Next, the `update_distro` function is called, as described below.
+To support modularization and improve readability, the script is comprised of three general function classifications: 
 
-### Determining Distribution and Updating Installed Packages
-The `update_distro` function determines the distribution via a set of conditionals that test grep searches of the `/etc/os-release` file for distribution-specific keywords. Once a conditional returns true, the script runs the distribution-specific package manager update commands.
++ Utility Functions
++ Core Script Function: `update_distro`
++ Exit and Cleanup Functions
 
-### The `cleanup_script` Function and Exit Codes
-Upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock.
+These functions are called in logical fashion by the `main` function, which establishes the run order upon script invocation.
 
-If the script errors out on a Bash command, the command's exit code will return. For errors handled internally by the script, exit codes include:
+> **NOTE:** For a Bash template that includes the utility, exit, and cleanup functions described below, click [here](../bash-template).
+
+### 1. Utility Functions
+The `main` function first calls the following utility functions:
+
++ `init_script`: initializes constants, exit codes, and global variables. 
++ `check_root`: checks for root privileges and exits on failure.
++ `parse_params`: parses parameters provided by the user, assigning values and calling functions such as `usage` for script help.
++ `unset_colors`: determines text color settings.
++ `lock_script`: initiates a script lock.
+
+### 2. Core Script Function: `update_distro`
+Once the script is successfully locked, indicating that only one instance of the script is running, `main` proceeds to the core script function, `update_distro`. This function determines the distribution via a set of conditionals that test grep searches of the `/etc/os-release` file. Each conditional searches for distribution-specific keywords. Once a conditional returns true, the script runs the distribution-specific package manager update commands.
+
+### 3. Exit and Cleanup Functions
+If the script runs without an error, `main` invokes the `exit_script` function, gracefully exiting with an exit code of 0. The `exit_script` function is also used throughout the script to provide exit codes and messages for errors handled internally by the script. The exit codes are as follows:
 
 |Exit Code|Description|
 |---------|-----------|
@@ -18,13 +33,17 @@ If the script errors out on a Bash command, the command's exit code will return.
 |51|Unable to lock script|
 |52|Root privileges required|
 
+If the script errors out on a Bash command, the command's exit code will return. 
+
+As a final step, upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock. 
+
 ## Getting Started
 
 ### Dependencies
 
 + OS: Linux (Standard distros: Debian/Ubuntu, Arch, RHEL, openSUSE)
 
-**NOTE:** The script has been tested on numerous distributions, including Rocky, CentOS, Debian, Ubuntu, Mint, Arch, Kali, and openSUSE.
+> **NOTE:** The script has been tested on numerous distributions, including Rocky, CentOS, Debian, Ubuntu, Mint, Arch, Kali, and openSUSE.
 
 ### Installation
 To install the script, either clone the [bash-admin-scripts](..) repo or download the [update-distros.sh](./update-distros.sh) file to the local host. As with all Bash scripts, the script can be saved to `usr/local/bin` for system-wide availability, although this is not required.
