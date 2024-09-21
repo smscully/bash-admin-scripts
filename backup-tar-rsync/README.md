@@ -2,21 +2,39 @@
 The [backup-tar-rsync.sh](./backup-tar-rsync.sh) script creates a gzip compressed tar archive of selected files and/or directories and uses `rsync` to copy the tar archive to a remote SSH server. The script supports daily, weekly, and monthly backups, which will typically be scheduled as `cron` jobs. One-time backups can be run on an ad hoc basis.
 
 ## Description
-Upon invocation, the script calls the `main` function, which first initializes variables, checks for root privileges, parses parameters, determines text color settings, and initiates a script lock. The script then calls the `backup` function, as described below.
+To support modularization and improve readability, the script is comprised of three general function classifications: 
 
-### Creating the Archive, Deleting Old Archives, and Copying the Archive to the Remote SSH Server
-The `backup` function performs the primary work of the script. The function first reads the `backup.settings` file, which stores data regarding the backup files and/or directories, the local and remote save directories for the tar archive, the rsync remote SSH server (and port if non-standard), and the absolute path to local SSH key file. Thereafter, the function calls the `tar` command to create the archive with gzip compression, runs the `find` command to delete old archives, and copies the tar archive to the remote SSH server using `rsync`.
++ Utility Functions
++ Core Script Function: `backup`
++ Exit and Cleanup Functions
 
-### The `cleanup_script` Function and Exit Codes
-Upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock.
+These functions are called in logical fashion by the `main` function, which establishes the run order upon script invocation.
 
-If the script errors out on a Bash command, the command's exit code will return. For errors handled internally by the script, exit codes include:
+> **NOTE:** For a Bash template that includes the utility, exit, and cleanup functions described below, click [here](../bash-template).
+
+### 1. Utility Functions
+The `main` function first calls the following utility functions:
+
++ `init_script`: initializes constants, exit codes, and global variables. 
++ `parse_params`: parses parameters provided by the user, assigning values and calling functions such as `usage` for script help.
++ `unset_colors`: determines text color settings.
++ `lock_script`: initiates a script lock.
+
+### 2. Core Script Function: `backup`
+Once the script is successfully locked, indicating that only one instance of the script is running, `main` proceeds to the core script function, `backup`. This function first reads the `backup.settings` file, which stores data regarding the backup files and/or directories, the local and remote save directories for the tar archive, the rsync remote SSH server (and port if non-standard), and the absolute path to local SSH key file. Then the function calls the `tar` command to create the archive with gzip compression, runs the `find` command to delete old archives, and copies the tar archive to the remote SSH server using `rsync`.
+
+### 3. Exit and Cleanup Functions
+If the script runs without an error, `main` invokes the `exit_script` function, gracefully exiting with an exit code of 0. The `exit_script` function is also used throughout the script to provide exit codes and messages for errors handled internally by the script. The exit codes are as follows:
 
 |Exit Code|Description|
 |---------|-----------|
 |50|Invalid script option|
 |51|Unable to lock script|
 |52|Incorrect number of parameters|
+
+If the script errors out on a Bash command, the command's exit code will return. 
+
+As a final step, upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock. 
 
 ## Getting Started
 
