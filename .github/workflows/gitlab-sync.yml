@@ -1,0 +1,22 @@
+name: "Backup to GitLab"
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for running manually"
+        required: false
+        type: string
+         
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Run gitlab-sync"
+        uses: kujov/gitlab-sync@main
+        with:         
+          gitlab_url: ${{ secrets.GITLAB_URL }}
+          username: ${{ secrets.GITLAB_USERNAME }}
+          gitlab_pat: ${{ secrets.GITLAB_PAT }}
