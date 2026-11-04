@@ -10,13 +10,12 @@ set -Eeuo pipefail
 ########################################
 # Initialize constants, exit codes, and global variables
 # Arguments:
-#   $@ (required): Positional parameters passed to script 
+#   None
 ########################################
 function init_script(){
   # Constants
   readonly SCRIPT_PATH="${BASH_SOURCE[0]}"
-  readonly SCRIPT_NAME="$(basename "${SCRIPT_PATH}")"
-  readonly SCRIPT_PARAMS="${@}"
+  readonly SCRIPT_NAME="${SCRIPT_PATH##*/}"
   readonly OS_RELEASE="/etc/os-release"
 
   # Exit codes
@@ -280,7 +279,7 @@ function main() {
   trap 'exit 130' SIGINT
   trap 'exit 143' SIGTERM
 
-  init_script "${@}"
+  init_script
   parse_params "${@}"
   unset_colors 
   check_root

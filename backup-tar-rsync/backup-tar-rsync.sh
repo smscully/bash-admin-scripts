@@ -13,14 +13,16 @@ set -Eeuo pipefail
 ########################################
 # Initialize constants, exit codes, and global variables
 # Arguments:
-#   $@ (required): Positional parameters passed to script 
+#   None
 ########################################
 function init_script(){
+  local script_dir
+
   # Constants
   readonly SCRIPT_PATH="${BASH_SOURCE[0]}"
-  readonly SCRIPT_NAME="$(basename "${SCRIPT_PATH}")"
-  readonly SCRIPT_PARAMS="${@}"
-  readonly SETTINGS_FILE="$(dirname "${SCRIPT_PATH}")/backup.settings"
+  readonly SCRIPT_NAME="${SCRIPT_PATH##*/}"
+  script_dir="$(dirname -- "${SCRIPT_PATH}")"
+  readonly SETTINGS_FILE="${script_dir}/backup.settings"
 
   # Exit codes
   readonly ERR_INV_OPT=50         # Invalid script option
@@ -221,7 +223,7 @@ function backup() {
   local line=""
   local remote_dir=""
   local remote_prune=""
-  local tar_archive="backup-$(date +%Y-%m-%d-%H-%M-%S).tgz"
+  local tar_archive=""
   local tar_files=()
   local save_dir_local=""
   local save_dir_remote=""
@@ -294,6 +296,7 @@ function backup() {
     exit_script "${ERR_SETTINGS}" "${red}SSH key under --SSH_KEY-- is missing or not readable: ${ssh_key}${noformat}"
   fi
 
+  tar_archive="backup-$(date +%Y-%m-%d-%H-%M-%S).tgz"
   archive_dir="${save_dir_local}/${backup_freq}"
   remote_dir="${save_dir_remote%/}/${backup_freq}"
 
@@ -336,7 +339,7 @@ function main() {
   trap 'exit 130' SIGINT
   trap 'exit 143' SIGTERM
 
-  init_script "${@}"
+  init_script
   parse_params "${@}"
   unset_colors 
   lock_script
