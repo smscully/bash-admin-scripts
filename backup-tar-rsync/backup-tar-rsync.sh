@@ -291,8 +291,9 @@ backup() {
   # Create tar archive with gzip compression
   tar -zcf "${save_dir_local}/${backup_freq}/${tar_archive}" -C / "${tar_files[@]}"
 
-  # Delete older archives based on frequency
-  find ${save_dir_local}/${backup_freq} -type f -mtime +"${backup_del}" -delete
+  # Delete older archives based on frequency. Only this script's own
+  # archives are matched; both path parts were checked as non-empty above.
+  find "${save_dir_local}/${backup_freq}" -type f -name 'backup-*.tgz' -mtime +"${backup_del}" -delete
 
   # Copy archive to remote SSH and delete extraneous 
   rsync -e "ssh -i ${ssh_key}" -a --delete "${save_dir_local}/${backup_freq}" "${ssh_server}:${save_dir_remote}"
