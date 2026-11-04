@@ -32,11 +32,11 @@ function init_script(){
   backup_freq=""
   script_lock=""
   no_color="false"
-  noformat="\033[0;0m"
-  red="\033[0;31m"
-  green="\033[0;32m"
-  yellow="\033[0;33m"
-  blue="\033[0;34m"
+  noformat=$'\033[0;0m'
+  red=$'\033[0;31m'
+  green=$'\033[0;32m'
+  yellow=$'\033[0;33m'
+  blue=$'\033[0;34m'
 }
 
 ########################################
@@ -78,7 +78,7 @@ function cleanup_script(){
 ########################################
 function exit_script() {
   if [[ -n "$2" ]]; then
-    printf "$2\n" >&2
+    printf '%s\n' "$2" >&2
   fi
   exit "$1"
 }
@@ -252,7 +252,8 @@ backup() {
   # Copy archive to remote SSH and delete extraneous 
   /usr/bin/rsync -e "ssh -i ${ssh_key}" -a --delete "${save_dir_local}/${backup_freq}" "${ssh_server}:${save_dir_remote}"
 
-  printf "The tar archive ${tar_archive} was created and saved to the remote backup location at: ${ssh_server}:${save_dir_remote}/${backup_freq}\n"
+  printf 'The tar archive %s was created and saved to the remote backup location at: %s:%s/%s\n' \
+    "${tar_archive}" "${ssh_server}" "${save_dir_remote}" "${backup_freq}"
 }
 
 ########################################
