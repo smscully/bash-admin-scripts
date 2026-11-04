@@ -22,7 +22,7 @@ function init_script(){
   # Exit codes
   readonly ERR_INV_OPT=50         # Invalid script option
   readonly ERR_LOCK=51            # Unable to lock script
-  readonly ERR_ROOT_PRIV=52       # Root privileges required
+  readonly ERR_ROOT_PRIV=53       # Root privileges required
   readonly ERR_DISTRO=54          # Unsupported or unknown distribution
 
   # Global variables
@@ -290,6 +290,9 @@ function main() {
 }
 
 ########################################
-# Invoke main function
+# Invoke main function, unless the file is being sourced (for example by
+# the tests, which load the functions without running the script)
 ########################################
-main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi

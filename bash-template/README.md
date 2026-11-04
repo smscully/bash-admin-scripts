@@ -56,7 +56,10 @@ If the script requires root privileges, ensure that the `main` function includes
 The generic function called `function_name` serves as a skeleton that can be customized as needed. It should be renamed as appropriate, and the header modified to reflect its global variables, arguments, outputs, and returns.
 
 ### The `main` Function
-The logical flow of the script is contained within the `main` function, which makes calls to the other primary script functions. The last non-comment line of the script calls `main`. 
+The logical flow of the script is contained within the `main` function, which makes calls to the other primary script functions. The last lines of the script call `main`, unless the file is being sourced, so tests can load the functions without running the script.
+
+### Keeping Copies in Sync
+Scripts built from the template are standalone, so each one carries its own copy of the shared functions (`exit_script`, `lock_script`, `unset_colors`, and `check_root`). A test in `tests/shared-functions.bats` fails if those copies differ between scripts, so a fix made in one place has to be made in all of them. The exit codes 50 to 53 mean the same thing in every script; script-specific codes start at 54.
 
 ## Style Guide
 Best efforts are made to follows the rules outlined in the [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html). While there may be instances of divergence, the template generally adheres to the guidelines promulgated for formatting, naming conventions, and comments. 

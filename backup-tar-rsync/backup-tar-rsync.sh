@@ -216,7 +216,7 @@ EOF
 # Arguments:
 #   None
 ########################################
-backup() {
+function backup() {
   local archive_dir=""
   local line=""
   local remote_dir=""
@@ -345,6 +345,9 @@ function main() {
 }
 
 ########################################
-# Invoke main function
+# Invoke main function, unless the file is being sourced (for example by
+# the tests, which load the functions without running the script)
 ########################################
-main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi

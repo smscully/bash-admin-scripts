@@ -31,7 +31,7 @@ If the script runs without an error, `main` invokes the `exit_script` function, 
 |---------|-----------|
 |50|Invalid script option or unexpected argument|
 |51|Unable to lock script|
-|52|Root privileges required|
+|53|Root privileges required (was 52 before the exit codes were aligned with the template)|
 |54|Unsupported or unknown distribution|
 
 If the script errors out on a Bash command, the command's exit code will return. 
