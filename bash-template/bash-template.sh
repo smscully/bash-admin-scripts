@@ -1,4 +1,4 @@
-#!/bin/bash -i
+#!/usr/bin/env bash
 set -Eeuo pipefail
 
 # script-name.sh
@@ -10,13 +10,12 @@ set -Eeuo pipefail
 ########################################
 # Initialize constants, exit codes, and global variables
 # Arguments:
-#   $@ (required): Positional parameters passed to script 
+#   None
 ########################################
 function init_script(){
   # Constants
   readonly SCRIPT_PATH="${BASH_SOURCE[0]}"
-  readonly SCRIPT_NAME="$(basename "${SCRIPT_PATH}")"
-  readonly SCRIPT_PARAMS="${@}"
+  readonly SCRIPT_NAME="${SCRIPT_PATH##*/}"
 
   # Exit codes
   readonly ERR_INV_OPT=50         # Invalid script option
@@ -25,13 +24,16 @@ function init_script(){
   readonly ERR_ROOT_PRIV=53       # Root privileges required
 
   # Global variables
-  script_lock=""
+  lock_fd=""
   no_color="false"
-  noformat="\033[0;0m"
-  red="\033[0;31m"
-  green="\033[0;32m"
-  yellow="\033[0;33m"
-  blue="\033[0;34m"
+
+  # Text colors: only when stdout and stderr are terminals and NO_COLOR is unset
+  noformat=""
+  red=""
+  if [[ -t 1 && -t 2 && -z "${NO_COLOR:-}" ]]; then
+    noformat=$'\033[0;0m'
+    red=$'\033[0;31m'
+  fi
 }
 
 ########################################
@@ -40,27 +42,38 @@ function init_script(){
 #   None
 ########################################
 function lock_script() {
-  local lock_dir="/tmp/${SCRIPT_NAME}.lock"
+  local lock_dir
+  local lock_file
 
-  if /usr/bin/mkdir "${lock_dir}"; then
-    script_lock="${lock_dir}"
+  # Root uses /run, which only root can write. Other users use their private
+  # runtime directory, falling back to /tmp (for example under cron).
+  if [[ "${EUID}" -eq 0 ]]; then
+    lock_dir="/run"
   else
+    lock_dir="${XDG_RUNTIME_DIR:-/tmp}"
+  fi
+  if [[ ! -d "${lock_dir}" || ! -w "${lock_dir}" ]]; then
+    lock_dir="/tmp"
+  fi
+  lock_file="${lock_dir}/${SCRIPT_NAME}.lock"
+
+  # flock holds the lock on an open file descriptor. The kernel releases it
+  # when the script exits, even after kill -9, so a stale lock cannot block
+  # the next run.
+  if ! { exec {lock_fd}>>"${lock_file}"; } 2>/dev/null || ! flock -n "${lock_fd}"; then
     exit_script "${ERR_LOCK}" "${red}Script lock could not be acquired. Please close other instances of the script, then rerun.${noformat}"
   fi
 }
 
 ########################################
-# Clean up tasks, such as deleting temp resources
+# Clean up tasks, such as deleting temp resources. Runs from the EXIT trap.
 # Arguments:
 #   None
 ########################################
 function cleanup_script(){
-  # disable trap handler to avoid recursion
-  trap - SIGINT SIGTERM ERR EXIT
-
-  if [[ -d "${script_lock}" ]]; then
-    /usr/bin/rmdir "${script_lock}"
-  fi 
+  # The script lock is released automatically on exit. Add other tasks
+  # here, such as deleting temporary files.
+  :
 }
 
 ########################################
@@ -73,7 +86,7 @@ function cleanup_script(){
 ########################################
 function exit_script() {
   if [[ -n "$2" ]]; then
-    printf "$2\n" >&2
+    printf '%s\n' "$2" >&2
   fi
   exit "$1"
 }
@@ -107,8 +120,11 @@ function parse_params() {
         PS4='$LINENO:'
         set -x
         ;;
-      -* | --*) 
+      -*)
         exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param}. Please use the -h option to view Help.${noformat}"
+        ;;
+      *)
+        exit_script "${ERR_INV_OPT}" "${red}Unexpected argument: ${param}. Please use the -h option to view Help.${noformat}"
         ;;
     esac
   done
@@ -120,9 +136,6 @@ function parse_params() {
 #   no_color
 #   noformat
 #   red
-#   green
-#   yellow
-#   blue
 # Arguments:
 #   None
 ########################################
@@ -130,9 +143,6 @@ function unset_colors() {
   if [[ "${no_color}" == "true" ]]; then
     noformat=""
     red=""
-    green=""
-    yellow=""
-    blue=""
   fi 
 }
 
@@ -184,6 +194,7 @@ function check_root() {
 ########################################
 function function_name() {
   # Function code
+  :
 }
 
 ########################################
@@ -192,18 +203,25 @@ function function_name() {
 #   $@ (required): Positional parameters passed to script 
 ########################################
 function main() {
-  trap cleanup_script SIGINT SIGTERM ERR EXIT
+  # Clean up on every exit, including errors caught by 'set -e'.
+  # A signal must also stop the script, so exit with 128 + signal number.
+  trap cleanup_script EXIT
+  trap 'exit 130' SIGINT
+  trap 'exit 143' SIGTERM
 
-  init_script "${@}"
-  check_root
+  init_script
   parse_params "${@}"
   unset_colors 
+  check_root
   lock_script
   # Insert additional functions
   exit_script 0 ""
 }
 
 ########################################
-# Invoke main function
+# Invoke main function, unless the file is being sourced (for example by
+# the tests, which load the functions without running the script)
 ########################################
-main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi

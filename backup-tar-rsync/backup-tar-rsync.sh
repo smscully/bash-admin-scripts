@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -Eeuo pipefail
 
 # backup-tar-rsync.sh
@@ -13,30 +13,37 @@ set -Eeuo pipefail
 ########################################
 # Initialize constants, exit codes, and global variables
 # Arguments:
-#   $@ (required): Positional parameters passed to script 
+#   None
 ########################################
 function init_script(){
+  local script_dir
+
   # Constants
   readonly SCRIPT_PATH="${BASH_SOURCE[0]}"
-  readonly SCRIPT_NAME="$(basename "${SCRIPT_PATH}")"
-  readonly SCRIPT_PARAMS="${@}"
-  readonly SETTINGS_FILE="$(dirname ${SCRIPT_PATH})/backup.settings"
+  readonly SCRIPT_NAME="${SCRIPT_PATH##*/}"
+  script_dir="$(dirname -- "${SCRIPT_PATH}")"
+  readonly SETTINGS_FILE="${script_dir}/backup.settings"
 
   # Exit codes
   readonly ERR_INV_OPT=50         # Invalid script option
   readonly ERR_LOCK=51            # Unable to lock script
   readonly ERR_NUM_PARAMS=52      # Incorrect number of parameters
+  readonly ERR_SETTINGS=54        # Missing or invalid backup.settings value
 
   # Global variables
   backup_del=""
   backup_freq=""
-  script_lock=""
+  lock_fd=""
+  partial_archive=""
   no_color="false"
-  noformat="\033[0;0m"
-  red="\033[0;31m"
-  green="\033[0;32m"
-  yellow="\033[0;33m"
-  blue="\033[0;34m"
+
+  # Text colors: only when stdout and stderr are terminals and NO_COLOR is unset
+  noformat=""
+  red=""
+  if [[ -t 1 && -t 2 && -z "${NO_COLOR:-}" ]]; then
+    noformat=$'\033[0;0m'
+    red=$'\033[0;31m'
+  fi
 }
 
 ########################################
@@ -45,27 +52,40 @@ function init_script(){
 #   None
 ########################################
 function lock_script() {
-  local lock_dir="/tmp/${SCRIPT_NAME}.lock"
+  local lock_dir
+  local lock_file
 
-  if /usr/bin/mkdir "${lock_dir}"; then
-    script_lock="${lock_dir}"
+  # Root uses /run, which only root can write. Other users use their private
+  # runtime directory, falling back to /tmp (for example under cron).
+  if [[ "${EUID}" -eq 0 ]]; then
+    lock_dir="/run"
   else
+    lock_dir="${XDG_RUNTIME_DIR:-/tmp}"
+  fi
+  if [[ ! -d "${lock_dir}" || ! -w "${lock_dir}" ]]; then
+    lock_dir="/tmp"
+  fi
+  lock_file="${lock_dir}/${SCRIPT_NAME}.lock"
+
+  # flock holds the lock on an open file descriptor. The kernel releases it
+  # when the script exits, even after kill -9, so a stale lock cannot block
+  # the next run.
+  if ! { exec {lock_fd}>>"${lock_file}"; } 2>/dev/null || ! flock -n "${lock_fd}"; then
     exit_script "${ERR_LOCK}" "${red}Script lock could not be acquired. Please close other instances of the script, then rerun.${noformat}"
   fi
 }
 
 ########################################
-# Clean up tasks, such as deleting temp resources
+# Clean up tasks, such as deleting temp resources. Runs from the EXIT trap.
 # Arguments:
 #   None
 ########################################
 function cleanup_script(){
-  # Disable trap handler to avoid recursion
-  trap - SIGINT SIGTERM ERR EXIT
-
-  if [[ -d "${script_lock}" ]]; then
-    /usr/bin/rmdir "${script_lock}"
-  fi 
+  # The script lock is released automatically on exit. Remove an archive
+  # left unfinished by a failed or interrupted run.
+  if [[ -n "${partial_archive:-}" && -f "${partial_archive}" ]]; then
+    rm -f -- "${partial_archive}"
+  fi
 }
 
 ########################################
@@ -78,7 +98,7 @@ function cleanup_script(){
 ########################################
 function exit_script() {
   if [[ -n "$2" ]]; then
-    printf "$2\n" >&2
+    printf '%s\n' "$2" >&2
   fi
   exit "$1"
 }
@@ -90,11 +110,7 @@ function exit_script() {
 ########################################
 function parse_params() {
   local param
-
-  # If no parameters passed, exit
-  if [[ "$#" -eq 0 ]]; then
-    exit_script "${ERR_NUM_PARAMS}" "${red}Incorrect number of parameters. Please use the -h option to view Help.${noformat}"
-  fi
+  local freq_count=0
 
   while [[ $# -gt 0 ]];do
     param="$1"
@@ -103,6 +119,7 @@ function parse_params() {
       -d | --daily)
         backup_freq="daily"
         backup_del=7
+        freq_count=$((freq_count + 1))
         ;;
       -h | --help)
         usage
@@ -110,6 +127,7 @@ function parse_params() {
       -m | --monthly)
         backup_freq="monthly"
         backup_del=365
+        freq_count=$((freq_count + 1))
         ;;
       -n | --no-color)
         no_color="true"
@@ -117,6 +135,7 @@ function parse_params() {
       -o | --once)
         backup_freq="once"
         backup_del=0
+        freq_count=$((freq_count + 1))
         ;;
       -v | --verbose)
         PS4='$LINENO:'
@@ -125,12 +144,21 @@ function parse_params() {
       -w | --weekly)
         backup_freq="weekly"
         backup_del=30
+        freq_count=$((freq_count + 1))
         ;;
-      -*) 
+      -*)
         exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param}. Please use the -h option to view Help.${noformat}"
+        ;;
+      *)
+        exit_script "${ERR_INV_OPT}" "${red}Unexpected argument: ${param}. Please use the -h option to view Help.${noformat}"
         ;;
     esac
   done
+
+  # Exactly one frequency option is required (-h exits above, inside usage)
+  if [[ "${freq_count}" -ne 1 ]]; then
+    exit_script "${ERR_NUM_PARAMS}" "${red}Exactly one frequency option (-d, -w, -m or -o) is required. Please use the -h option to view Help.${noformat}"
+  fi
 }
 
 ########################################
@@ -139,9 +167,6 @@ function parse_params() {
 #   no_color
 #   noformat
 #   red
-#   green
-#   yellow
-#   blue
 # Arguments:
 #   None
 ########################################
@@ -149,9 +174,6 @@ function unset_colors() {
   if [[ "${no_color}" == "true" ]]; then
     noformat=""
     red=""
-    green=""
-    yellow=""
-    blue=""
   fi 
 }
 
@@ -196,9 +218,12 @@ EOF
 # Arguments:
 #   None
 ########################################
-backup() {
+function backup() {
+  local archive_dir=""
   local line=""
-  local tar_archive="backup-$(date +%Y-%m-%d-%H-%M-%S).tgz"
+  local remote_dir=""
+  local remote_prune=""
+  local tar_archive=""
   local tar_files=()
   local save_dir_local=""
   local save_dir_remote=""
@@ -206,9 +231,17 @@ backup() {
   local ssh_server=""
   local section=""
 
-  # Read backup.settings file; assign entries to variables
-  while read line;do
-    case $line in
+  if [[ ! -r "${SETTINGS_FILE}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}Settings file not found or not readable: ${SETTINGS_FILE}${noformat}"
+  fi
+
+  # Read backup.settings file; assign entries to variables. Lines are read
+  # verbatim (no backslash or whitespace processing), and blank lines are
+  # skipped. The '|| [[ -n ]]' keeps a last line that has no newline.
+  while IFS= read -r line || [[ -n "${line}" ]];do
+    case "${line}" in
+      "")
+        ;;
       --TAR_FILES--)
         section="F"
         ;;
@@ -241,18 +274,57 @@ backup() {
         fi
         ;;
     esac
-  done < $SETTINGS_FILE
+  done < "${SETTINGS_FILE}"
 
-  # Create tar archive with gzip compression
-  /usr/bin/tar -zcf "${save_dir_local}/${backup_freq}/${tar_archive}" -C / "${tar_files[@]}"
+  # Check every setting before running anything that writes or deletes
+  if [[ "${#tar_files[@]}" -eq 0 ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No files listed under --TAR_FILES-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ -z "${save_dir_local}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No directory set under --SAVE_DIR_LOCAL-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ ! -d "${save_dir_local}/${backup_freq}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}Local save directory does not exist: ${save_dir_local}/${backup_freq}${noformat}"
+  fi
+  if [[ -z "${save_dir_remote}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No directory set under --SAVE_DIR_REMOTE-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ -z "${ssh_server}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No server set under --SSH_SERVER-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ -z "${ssh_key}" || ! -r "${ssh_key}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}SSH key under --SSH_KEY-- is missing or not readable: ${ssh_key}${noformat}"
+  fi
 
-  # Delete older archives based on frequency
-  /usr/bin/find ${save_dir_local}/${backup_freq} -type f -mtime +"${backup_del}" -delete
+  tar_archive="backup-$(date +%Y-%m-%d-%H-%M-%S).tgz"
+  archive_dir="${save_dir_local}/${backup_freq}"
+  remote_dir="${save_dir_remote%/}/${backup_freq}"
 
-  # Copy archive to remote SSH and delete extraneous 
-  /usr/bin/rsync -e "ssh -i ${ssh_key}" -a --delete "${save_dir_local}/${backup_freq}" "${ssh_server}:${save_dir_remote}"
+  # Create tar archive with gzip compression. Write it under a .partial name
+  # and rename it once complete, so a failed run never leaves a truncated
+  # archive that looks finished (cleanup_script removes the partial file).
+  partial_archive="${archive_dir}/${tar_archive}.partial"
+  tar -zcf "${partial_archive}" -C / "${tar_files[@]}"
+  mv -- "${partial_archive}" "${archive_dir}/${tar_archive}"
+  partial_archive=""
 
-  printf "The tar archive ${tar_archive} was created and saved to the remote backup location at: ${ssh_server}:${save_dir_remote}/${backup_freq}\n"
+  # Delete older archives based on frequency. Only this script's own
+  # archives are matched; both path parts were checked as non-empty above.
+  find "${archive_dir}" -type f -name 'backup-*.tgz' -mtime +"${backup_del}" -delete
+
+  # Copy new archives to the remote server. There is no --delete, and
+  # --ignore-existing never overwrites a remote file, so archives deleted or
+  # altered locally (for example by ransomware) do not spread to the remote.
+  rsync -e "ssh -i \"${ssh_key}\"" -a --ignore-existing --exclude='*.partial' \
+    "${archive_dir}" "${ssh_server}:${save_dir_remote}"
+
+  # Expire old archives on the remote with the same retention as locally.
+  # rsync -a keeps each archive's mtime, so the ages match.
+  remote_prune="find $(printf '%q' "${remote_dir}") -type f -name 'backup-*.tgz' -mtime +${backup_del} -delete"
+  ssh -i "${ssh_key}" "${ssh_server}" "${remote_prune}"
+
+  printf 'The tar archive %s was created and saved to the remote backup location at: %s:%s\n' \
+    "${tar_archive}" "${ssh_server}" "${remote_dir}"
 }
 
 ########################################
@@ -261,9 +333,13 @@ backup() {
 #   $@ (required): Positional parameters passed to script 
 ########################################
 function main() {
-  trap cleanup_script SIGINT SIGTERM ERR EXIT
+  # Clean up on every exit, including errors caught by 'set -e'.
+  # A signal must also stop the script, so exit with 128 + signal number.
+  trap cleanup_script EXIT
+  trap 'exit 130' SIGINT
+  trap 'exit 143' SIGTERM
 
-  init_script "${@}"
+  init_script
   parse_params "${@}"
   unset_colors 
   lock_script
@@ -272,6 +348,9 @@ function main() {
 }
 
 ########################################
-# Invoke main function
+# Invoke main function, unless the file is being sourced (for example by
+# the tests, which load the functions without running the script)
 ########################################
-main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi

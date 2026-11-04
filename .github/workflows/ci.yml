@@ -1,0 +1,31 @@
+name: "CI"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Run shellcheck"
+        run: |
+          shellcheck --version
+          shellcheck -x ./*/*.sh tests/*.bash tests/*.bats
+
+  bats:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Install bats and rsync"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats rsync
+      - name: "Run bats tests"
+        run: bats --print-output-on-failure tests

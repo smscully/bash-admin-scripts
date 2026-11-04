@@ -18,23 +18,26 @@ The `main` function first calls the following utility functions:
 + `init_script`: initializes constants, exit codes, and global variables. 
 + `parse_params`: parses parameters provided by the user, assigning values and calling functions such as `usage` for script help.
 + `unset_colors`: determines text color settings.
-+ `lock_script`: initiates a script lock.
++ `lock_script`: initiates a script lock, so only one instance runs at a time.
 
 ### 2. Core Script Function: `backup`
-Once the script is successfully locked, indicating that only one instance of the script is running, `main` proceeds to the core script function, `backup`. This function first reads the `backup.settings` file, which stores data regarding the backup files and/or directories, the local and remote save directories for the tar archive, the rsync remote SSH server (and port if non-standard), and the absolute path to local SSH key file. Then the function calls the `tar` command to create the archive with gzip compression, runs the `find` command to delete old archives, and copies the tar archive to the remote SSH server using `rsync`.
+Once the script is successfully locked, indicating that only one instance of the script is running, `main` proceeds to the core script function, `backup`. This function first reads the `backup.settings` file, which stores data regarding the backup files and/or directories, the local and remote save directories for the tar archive, the rsync remote SSH server (and port if non-standard), and the absolute path to local SSH key file. Then the function calls the `tar` command to create the archive with gzip compression, runs the `find` command to delete old archives, copies new archives to the remote SSH server using `rsync`, and then deletes old archives on the remote server over `ssh`.
+
+The `rsync` copy never deletes or overwrites anything on the remote server (it uses `--ignore-existing` and no `--delete`). As a result, archives that are deleted, or encrypted by ransomware, in the local save directory are not removed from the remote copy. Old remote archives are expired separately, by running `find ... -mtime +N -delete` on the remote server with the same retention as locally. The archive is written under a `.partial` name and renamed only once `tar` succeeds, so an interrupted run never leaves a truncated archive that looks complete.
 
 ### 3. Exit and Cleanup Functions
 If the script runs without an error, `main` invokes the `exit_script` function, gracefully exiting with an exit code of 0. The `exit_script` function is also used throughout the script to provide exit codes and messages for errors handled internally by the script. The exit codes are as follows:
 
 |Exit Code|Description|
 |---------|-----------|
-|50|Invalid script option|
+|50|Invalid script option or unexpected argument|
 |51|Unable to lock script|
-|52|Incorrect number of parameters|
+|52|Missing frequency option, or more than one|
+|54|Missing or invalid `backup.settings` value|
 
 If the script errors out on a Bash command, the command's exit code will return. 
 
-As a final step, upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock. 
+If the script is stopped by SIGINT or SIGTERM, it exits with code 130 or 143 respectively. As a final step, whenever the script exits, the `trap` command calls the `cleanup_script` function. The script lock is held with `flock` (in `/run` when running as root, otherwise in `$XDG_RUNTIME_DIR` or `/tmp`) and is released automatically when the script exits. 
 
 ## Getting Started
 
@@ -64,6 +67,8 @@ These subdirectories need not be created in the remote save directory, as `rsync
 ### 3. Create the SSH Key
 Because the script employs `rsync`, the local host and remote server must connect via SSH. An SSH key must be created on the local host, with its public key copied to the remote SSH server. The passphrase value of the SSH key should be left empty, since it is not realistic to schedule a `cron` job that would require user input.
 
+The key must be allowed to run commands on the remote server, not only `rsync`, because the script runs `find` there to expire old archives. For stronger protection against a compromised local host, which holds this key, also keep the remote copies on storage that cannot be deleted for a retention period (for example, filesystem snapshots or object storage with a lock).
+
 ### 4. Customize the `backup.settings` File
 Using the provided backup.settings file, make the following customizations:
 
@@ -90,10 +95,10 @@ backup@10.0.2.6
 --EOF--
 ```
 
-Each backup file or directory must be listed on a separate line. Additionally, the [backup.settings](./backup.settings) file must be stored in the same directory as the [backup-tar-rsync.sh](./backup-tar-rsync.sh) file.
+Each backup file or directory must be listed on a separate line. Lines are read exactly as written (leading and trailing spaces are kept, and backslashes are not special), and blank lines are ignored. Before creating the archive, the script checks that every section has a value, that the local save directory for the chosen frequency exists, and that the SSH key is readable; if not, it exits with code 54. Additionally, the [backup.settings](./backup.settings) file must be stored in the same directory as the [backup-tar-rsync.sh](./backup-tar-rsync.sh) file.
 
 ### 5. Configure `cron` Jobs (Optional)
-While the script can be run on an ad hoc basis, the daily, weekly, and monthly options are designed to support a standard backup regimen using `cron` jobs. In this connection, the script deletes daily backups older than 7 days, weekly backups older than 30 days, and monthly backups older than 365 days.
+While the script can be run on an ad hoc basis, the daily, weekly, and monthly options are designed to support a standard backup regimen using `cron` jobs. In this connection, the script deletes daily backups older than 7 days, weekly backups older than 30 days, and monthly backups older than 365 days, both locally and on the remote server.
 
 As an example, to schedule a weekly backup at 12:30 a.m. every Sunday, create the following `cron` entry:
 
@@ -102,7 +107,7 @@ As an example, to schedule a weekly backup at 12:30 a.m. every Sunday, create th
 ```
 
 ## Usage
-The script requires at least one of the following options:
+The script requires exactly one frequency option (or -h). The available options are:
 
 |Short Option|Long Option|Description|
 |---------|---------|-----------|
@@ -122,8 +127,7 @@ sudo ./backup-tar-rsync.sh -w -v
 However, please note the following caveats:
 
 + The script exits after displaying help, and calls the `usage` function before the `backup` function. As such, if both help and backup options are provided, only help will run.
-+ Only one backup option is processed. If multiple backup options are provided, only the last will take effect. 
-+ The script will throw an error if neither a frequency option (-d, -m, -o, -w) nor the help option (-h) is provided.
++ Exactly one frequency option (-d, -m, -o, -w) must be provided, unless the help option (-h) is used. With no frequency option, or more than one, the script exits with code 52.
 
 ## License
 Licensed under the [GNU General Public License v3.0](../LICENSE).

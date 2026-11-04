@@ -1,4 +1,4 @@
-#!/bin/bash -i
+#!/usr/bin/env bash
 set -Eeuo pipefail
 
 # update-distros.sh
@@ -10,28 +10,31 @@ set -Eeuo pipefail
 ########################################
 # Initialize constants, exit codes, and global variables
 # Arguments:
-#   $@ (required): Positional parameters passed to script 
+#   None
 ########################################
 function init_script(){
   # Constants
   readonly SCRIPT_PATH="${BASH_SOURCE[0]}"
-  readonly SCRIPT_NAME="$(basename "${SCRIPT_PATH}")"
-  readonly SCRIPT_PARAMS="${@}"
+  readonly SCRIPT_NAME="${SCRIPT_PATH##*/}"
   readonly OS_RELEASE="/etc/os-release"
 
   # Exit codes
   readonly ERR_INV_OPT=50         # Invalid script option
   readonly ERR_LOCK=51            # Unable to lock script
-  readonly ERR_ROOT_PRIV=52       # Root privileges required
+  readonly ERR_ROOT_PRIV=53       # Root privileges required
+  readonly ERR_DISTRO=54          # Unsupported or unknown distribution
 
   # Global variables
-  script_lock=""
+  lock_fd=""
   no_color="false"
-  noformat="\033[0;0m"
-  red="\033[0;31m"
-  green="\033[0;32m"
-  yellow="\033[0;33m"
-  blue="\033[0;34m"
+
+  # Text colors: only when stdout and stderr are terminals and NO_COLOR is unset
+  noformat=""
+  red=""
+  if [[ -t 1 && -t 2 && -z "${NO_COLOR:-}" ]]; then
+    noformat=$'\033[0;0m'
+    red=$'\033[0;31m'
+  fi
 }
 
 ########################################
@@ -40,27 +43,38 @@ function init_script(){
 #   None
 ########################################
 function lock_script() {
-  local lock_dir="/tmp/${SCRIPT_NAME}.lock"
+  local lock_dir
+  local lock_file
 
-  if /usr/bin/mkdir "${lock_dir}"; then
-    script_lock="${lock_dir}"
+  # Root uses /run, which only root can write. Other users use their private
+  # runtime directory, falling back to /tmp (for example under cron).
+  if [[ "${EUID}" -eq 0 ]]; then
+    lock_dir="/run"
   else
+    lock_dir="${XDG_RUNTIME_DIR:-/tmp}"
+  fi
+  if [[ ! -d "${lock_dir}" || ! -w "${lock_dir}" ]]; then
+    lock_dir="/tmp"
+  fi
+  lock_file="${lock_dir}/${SCRIPT_NAME}.lock"
+
+  # flock holds the lock on an open file descriptor. The kernel releases it
+  # when the script exits, even after kill -9, so a stale lock cannot block
+  # the next run.
+  if ! { exec {lock_fd}>>"${lock_file}"; } 2>/dev/null || ! flock -n "${lock_fd}"; then
     exit_script "${ERR_LOCK}" "${red}Script lock could not be acquired. Please close other instances of the script, then rerun.${noformat}"
   fi
 }
 
 ########################################
-# Clean up tasks, such as deleting temp resources
+# Clean up tasks, such as deleting temp resources. Runs from the EXIT trap.
 # Arguments:
 #   None
 ########################################
 function cleanup_script(){
-  # Disable trap handler to avoid recursion
-  trap - SIGINT SIGTERM ERR EXIT
-
-  if [[ -d "${script_lock}" ]]; then
-    /usr/bin/rmdir "${script_lock}"
-  fi 
+  # The script lock is released automatically on exit. Add other tasks
+  # here, such as deleting temporary files.
+  :
 }
 
 ########################################
@@ -73,7 +87,7 @@ function cleanup_script(){
 ########################################
 function exit_script() {
   if [[ -n "$2" ]]; then
-    printf "$2\n" >&2
+    printf '%s\n' "$2" >&2
   fi
   exit "$1"
 }
@@ -100,8 +114,11 @@ function parse_params() {
         PS4='$LINENO:'
         set -x
         ;;
-      -*) 
+      -*)
         exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param}. Please use the -h option to view Help.${noformat}"
+        ;;
+      *)
+        exit_script "${ERR_INV_OPT}" "${red}Unexpected argument: ${param}. Please use the -h option to view Help.${noformat}"
         ;;
     esac
   done
@@ -113,9 +130,6 @@ function parse_params() {
 #   no_color
 #   noformat
 #   red
-#   green
-#   yellow
-#   blue
 # Arguments:
 #   None
 ########################################
@@ -123,9 +137,6 @@ function unset_colors() {
   if [[ "${no_color}" == "true" ]]; then
     noformat=""
     red=""
-    green=""
-    yellow=""
-    blue=""
   fi 
 }
 
@@ -164,36 +175,96 @@ function check_root() {
 }
 
 ########################################
+# Determine the package manager family from an os-release file. Reads the
+# ID and ID_LIKE fields exactly (the file is not sourced), trying ID first
+# and then each ID_LIKE entry in order.
+# Arguments:
+#   $1 (required): Path to the os-release file
+# Outputs:
+#   Writes one of rhel, arch, debian or suse to stdout
+# Returns:
+#   0 if the distribution is recognized, 1 otherwise
+########################################
+function detect_distro() {
+  local os_release="$1"
+  local candidate
+  local candidates=()
+  local id=""
+  local id_like=""
+  local key
+  local value
+
+  if [[ ! -r "${os_release}" ]]; then
+    return 1
+  fi
+
+  while IFS='=' read -r key value || [[ -n "${key}" ]]; do
+    # Strip optional surrounding quotes
+    value="${value#[\"\']}"
+    value="${value%[\"\']}"
+    case "${key}" in
+      ID) id="${value}" ;;
+      ID_LIKE) id_like="${value}" ;;
+    esac
+  done < "${os_release}"
+
+  read -r -a candidates <<< "${id} ${id_like}"
+  for candidate in "${candidates[@]}"; do
+    case "${candidate}" in
+      rhel | centos | fedora | rocky)
+        echo "rhel"
+        return 0
+        ;;
+      arch)
+        echo "arch"
+        return 0
+        ;;
+      debian | ubuntu | linuxmint)
+        echo "debian"
+        return 0
+        ;;
+      suse | opensuse | opensuse-* | sles)
+        echo "suse"
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+########################################
 # Determine Linux distribution and run appropriate update commands
 # Arguments:
-#   None 
+#   $1 (required): Path to the os-release file
 # Ouputs:
 #   Writes command output to stdout
 ########################################
 function update_distro() {
-  # RHEL
-  if [[ $(grep -Ei "rhel|centos|fedora|rocky" "${OS_RELEASE}") ]]; then
-    if [[ $(command -v dnf) ]]; then
-      /usr/bin/dnf -y update
-    else
-      /usr/bin/yum -y update
-    fi
-  fi	
+  local family
 
-  # Arch
-  if [[ $(grep -Ei "arch" "${OS_RELEASE}") ]]; then
-    /usr/bin/pacman -Syu --noconfirm
-  fi	
+  if ! family="$(detect_distro "$1")"; then
+    exit_script "${ERR_DISTRO}" "${red}Unsupported or unknown distribution (checked ID and ID_LIKE in $1).${noformat}"
+  fi
 
-  # Debian
-  if [[ $(grep -Ei "debian|ubuntu|mint" "${OS_RELEASE}") ]]; then
-    /usr/bin/apt-get -y update && /usr/bin/apt-get -y upgrade
-  fi	
-
-  #  SUSE
-  if [[ $(grep -Ei "suse|opensuse" "${OS_RELEASE}") ]]; then
-    /usr/bin/zypper -n update
-  fi	
+  case "${family}" in
+    rhel)
+      if command -v dnf > /dev/null; then
+        dnf -y update
+      else
+        yum -y update
+      fi
+      ;;
+    arch)
+      pacman -Syu --noconfirm
+      ;;
+    debian)
+      apt-get -y update
+      apt-get -y upgrade
+      ;;
+    suse)
+      zypper -n update
+      ;;
+  esac
 }
 
 ########################################
@@ -202,18 +273,25 @@ function update_distro() {
 #   $@ (required): Positional parameters passed to script 
 ########################################
 function main() {
-  trap cleanup_script SIGINT SIGTERM ERR EXIT
+  # Clean up on every exit, including errors caught by 'set -e'.
+  # A signal must also stop the script, so exit with 128 + signal number.
+  trap cleanup_script EXIT
+  trap 'exit 130' SIGINT
+  trap 'exit 143' SIGTERM
 
-  init_script "${@}"
-  check_root
+  init_script
   parse_params "${@}"
   unset_colors 
+  check_root
   lock_script
-  update_distro
+  update_distro "${OS_RELEASE}"
   exit_script 0 ""
 }
 
 ########################################
-# Invoke main function
+# Invoke main function, unless the file is being sourced (for example by
+# the tests, which load the functions without running the script)
 ########################################
-main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi

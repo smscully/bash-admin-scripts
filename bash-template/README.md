@@ -15,13 +15,13 @@ The `set -Eeuo pipefail` statement configures the script execution options:
 The Bash Builtins man page provides an in-depth explanation of these options, as does this excellent [blog post](https://vaneyckt.io/posts/safer_bash_scripts_with_set_euxo_pipefail/).
 
 ### Initializing Script Variables
-All constants, exit codes, and global variables are initialized in the `init_script` function. This includes the color variables because the default state for text color is true.
+All constants, exit codes, and global variables are initialized in the `init_script` function. This includes the color variables.
 
 ### Locking the Script
-There are several methods to ensure only one instance of a script is running. (For a detailed explanation of the most common techniques, read [this article](https://www.baeldung.com/linux/bash-ensure-instance-running).) In the template, the `lock_script` function creates a temporary directory to indicate the script is in use, then removes the directory once the script completes.
+There are several methods to ensure only one instance of a script is running. (For a detailed explanation of the most common techniques, read [this article](https://www.baeldung.com/linux/bash-ensure-instance-running).) In the template, the `lock_script` function uses `flock` to hold a lock on a file named after the script: `/run/<script>.lock` when running as root, or `$XDG_RUNTIME_DIR/<script>.lock` otherwise (falling back to `/tmp`). The kernel releases the lock when the script exits for any reason, including `kill -9`, so a crashed run never leaves a stale lock behind.
 
 ### Performing Cleanup Tasks
-Upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function. For the template, the function simply deletes the directory created for the script lock. However, for complex scripts, additional tasks can be added, e.g. deleting temporary data files.
+The `trap` command calls the `cleanup_script` function whenever the script exits, whether it finishes normally, fails on a command (via `set -e`), or calls `exit_script`. SIGINT and SIGTERM are trapped separately so that they stop the script with exit code 130 or 143 (128 plus the signal number); the exit then runs `cleanup_script`. Without this, bash would run the cleanup and then carry on with the next command. For the template, the function has nothing to do, since the script lock is released automatically. For more complex scripts, tasks can be added, e.g. deleting temporary data files.
 
 ### Exiting the Script Gracefully
 Calls to the `exit_script` function will exit the script with the exit code passed as the first script argument. If a message is provided as a second argument, the message will be printed to stderr.
@@ -36,7 +36,9 @@ Next, a `while` loop with a `shift` statement cycles through the parameters, usi
 Presently, the template parses options but not arguments. To modify the `parse_params` function to include arguments, review this [post](https://medium.com/@Drew_Stokes/bash-argument-parsing-54f3b81a6a8f) by Drew Stokes, which provides an excellent explanation of how to parse options with their arguments.
 
 ### Text Colors
-By default, text colors are set to true, as the `init_script` function assigns color variables and sets the global variable `no_color` to false. Running the script with the -n or --no-color option resets `no_color` to true, and the `unset_colors` function will then reset the color variables to null values.
+Text colors are turned on only when both stdout and stderr are terminals and the [`NO_COLOR`](https://no-color.org/) environment variable is unset, so logs and cron mail do not get raw escape sequences. The `init_script` function makes that check and sets the color variables. Running the script with the -n or --no-color option sets `no_color` to true, and the `unset_colors` function then resets the color variables to empty values.
+
+The template defines only `red`, since that is the only color it uses. Define others the same way (for example `green=$'\033[0;32m'`) inside the same check.
 
 In the template, the only use of color is by the `exit_script` function, which prints color-formatted error messages to stderr. Color functionality, though, can be added to other print statements as needed. Doing so is as simple as adding a color tag (e.g., `${red}`) at the beginning of the text and a noformat tag (`${noformat}`) after the text. The following call to `exit_script` provides an example:
 
@@ -48,13 +50,16 @@ exit_script "${ERR_ROOT_PRIV}" "${red}Root privileges are required. Please run a
 Script help is encapsulated in the `usage` function. At a minimum, script help should provide usage instructions, a general description of the script, and a list of available options.
 
 ### Checking for Root Privileges
-If the script requires root privileges, ensure that the `main` function includes a call to the `check_root` function. The call, and indeed the function itself, can be removed when the script does not require root privileges.
+If the script requires root privileges, ensure that the `main` function includes a call to the `check_root` function, after `parse_params` so that `--help` works without root. The call, and indeed the function itself, can be removed when the script does not require root privileges.
 
 ### Generic Function Skeleton
 The generic function called `function_name` serves as a skeleton that can be customized as needed. It should be renamed as appropriate, and the header modified to reflect its global variables, arguments, outputs, and returns.
 
 ### The `main` Function
-The logical flow of the script is contained within the `main` function, which makes calls to the other primary script functions. The last non-comment line of the script calls `main`. 
+The logical flow of the script is contained within the `main` function, which makes calls to the other primary script functions. The last lines of the script call `main`, unless the file is being sourced, so tests can load the functions without running the script.
+
+### Keeping Copies in Sync
+Scripts built from the template are standalone, so each one carries its own copy of the shared functions (`exit_script`, `lock_script`, `unset_colors`, and `check_root`). A test in `tests/shared-functions.bats` fails if those copies differ between scripts, so a fix made in one place has to be made in all of them. The exit codes 50 to 53 mean the same thing in every script; script-specific codes start at 54.
 
 ## Style Guide
 Best efforts are made to follows the rules outlined in the [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html). While there may be instances of divergence, the template generally adheres to the guidelines promulgated for formatting, naming conventions, and comments. 
