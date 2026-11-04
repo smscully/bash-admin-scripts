@@ -184,6 +184,7 @@ function check_root() {
 ########################################
 function function_name() {
   # Function code
+  :
 }
 
 ########################################
