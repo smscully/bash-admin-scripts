@@ -20,12 +20,13 @@ function init_script(){
   readonly SCRIPT_PATH="${BASH_SOURCE[0]}"
   readonly SCRIPT_NAME="$(basename "${SCRIPT_PATH}")"
   readonly SCRIPT_PARAMS="${@}"
-  readonly SETTINGS_FILE="$(dirname ${SCRIPT_PATH})/backup.settings"
+  readonly SETTINGS_FILE="$(dirname "${SCRIPT_PATH}")/backup.settings"
 
   # Exit codes
   readonly ERR_INV_OPT=50         # Invalid script option
   readonly ERR_LOCK=51            # Unable to lock script
   readonly ERR_NUM_PARAMS=52      # Incorrect number of parameters
+  readonly ERR_SETTINGS=54        # Missing or invalid backup.settings value
 
   # Global variables
   backup_del=""
@@ -217,9 +218,17 @@ backup() {
   local ssh_server=""
   local section=""
 
-  # Read backup.settings file; assign entries to variables
-  while read line;do
-    case $line in
+  if [[ ! -r "${SETTINGS_FILE}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}Settings file not found or not readable: ${SETTINGS_FILE}${noformat}"
+  fi
+
+  # Read backup.settings file; assign entries to variables. Lines are read
+  # verbatim (no backslash or whitespace processing), and blank lines are
+  # skipped. The '|| [[ -n ]]' keeps a last line that has no newline.
+  while IFS= read -r line || [[ -n "${line}" ]];do
+    case "${line}" in
+      "")
+        ;;
       --TAR_FILES--)
         section="F"
         ;;
@@ -252,7 +261,27 @@ backup() {
         fi
         ;;
     esac
-  done < $SETTINGS_FILE
+  done < "${SETTINGS_FILE}"
+
+  # Check every setting before running anything that writes or deletes
+  if [[ "${#tar_files[@]}" -eq 0 ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No files listed under --TAR_FILES-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ -z "${save_dir_local}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No directory set under --SAVE_DIR_LOCAL-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ ! -d "${save_dir_local}/${backup_freq}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}Local save directory does not exist: ${save_dir_local}/${backup_freq}${noformat}"
+  fi
+  if [[ -z "${save_dir_remote}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No directory set under --SAVE_DIR_REMOTE-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ -z "${ssh_server}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}No server set under --SSH_SERVER-- in ${SETTINGS_FILE}${noformat}"
+  fi
+  if [[ -z "${ssh_key}" || ! -r "${ssh_key}" ]]; then
+    exit_script "${ERR_SETTINGS}" "${red}SSH key under --SSH_KEY-- is missing or not readable: ${ssh_key}${noformat}"
+  fi
 
   # Create tar archive with gzip compression
   tar -zcf "${save_dir_local}/${backup_freq}/${tar_archive}" -C / "${tar_files[@]}"

@@ -31,6 +31,7 @@ If the script runs without an error, `main` invokes the `exit_script` function, 
 |50|Invalid script option or unexpected argument|
 |51|Unable to lock script|
 |52|Incorrect number of parameters|
+|54|Missing or invalid `backup.settings` value|
 
 If the script errors out on a Bash command, the command's exit code will return. 
 
@@ -90,7 +91,7 @@ backup@10.0.2.6
 --EOF--
 ```
 
-Each backup file or directory must be listed on a separate line. Additionally, the [backup.settings](./backup.settings) file must be stored in the same directory as the [backup-tar-rsync.sh](./backup-tar-rsync.sh) file.
+Each backup file or directory must be listed on a separate line. Lines are read exactly as written (leading and trailing spaces are kept, and backslashes are not special), and blank lines are ignored. Before creating the archive, the script checks that every section has a value, that the local save directory for the chosen frequency exists, and that the SSH key is readable; if not, it exits with code 54. Additionally, the [backup.settings](./backup.settings) file must be stored in the same directory as the [backup-tar-rsync.sh](./backup-tar-rsync.sh) file.
 
 ### 5. Configure `cron` Jobs (Optional)
 While the script can be run on an ad hoc basis, the daily, weekly, and monthly options are designed to support a standard backup regimen using `cron` jobs. In this connection, the script deletes daily backups older than 7 days, weekly backups older than 30 days, and monthly backups older than 365 days.
