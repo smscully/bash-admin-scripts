@@ -16,9 +16,9 @@ These functions are called in logical fashion by the `main` function, which esta
 The `main` function first calls the following utility functions:
 
 + `init_script`: initializes constants, exit codes, and global variables. 
-+ `check_root`: checks for root privileges and exits on failure.
 + `parse_params`: parses parameters provided by the user, assigning values and calling functions such as `usage` for script help.
 + `unset_colors`: determines text color settings.
++ `check_root`: checks for root privileges and exits on failure. This runs after `parse_params`, so `--help` works without root.
 + `lock_script`: initiates a script lock.
 
 ### 2. Core Script Function: `update_distro`

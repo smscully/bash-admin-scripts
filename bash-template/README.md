@@ -48,7 +48,7 @@ exit_script "${ERR_ROOT_PRIV}" "${red}Root privileges are required. Please run a
 Script help is encapsulated in the `usage` function. At a minimum, script help should provide usage instructions, a general description of the script, and a list of available options.
 
 ### Checking for Root Privileges
-If the script requires root privileges, ensure that the `main` function includes a call to the `check_root` function. The call, and indeed the function itself, can be removed when the script does not require root privileges.
+If the script requires root privileges, ensure that the `main` function includes a call to the `check_root` function, after `parse_params` so that `--help` works without root. The call, and indeed the function itself, can be removed when the script does not require root privileges.
 
 ### Generic Function Skeleton
 The generic function called `function_name` serves as a skeleton that can be customized as needed. It should be renamed as appropriate, and the header modified to reflect its global variables, arguments, outputs, and returns.

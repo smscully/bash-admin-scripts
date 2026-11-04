@@ -197,9 +197,9 @@ function main() {
   trap 'exit 143' SIGTERM
 
   init_script "${@}"
-  check_root
   parse_params "${@}"
   unset_colors 
+  check_root
   lock_script
   # Insert additional functions
   exit_script 0 ""
