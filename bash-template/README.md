@@ -21,7 +21,7 @@ All constants, exit codes, and global variables are initialized in the `init_scr
 There are several methods to ensure only one instance of a script is running. (For a detailed explanation of the most common techniques, read [this article](https://www.baeldung.com/linux/bash-ensure-instance-running).) In the template, the `lock_script` function creates a temporary directory to indicate the script is in use, then removes the directory once the script completes.
 
 ### Performing Cleanup Tasks
-Upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function. For the template, the function simply deletes the directory created for the script lock. However, for complex scripts, additional tasks can be added, e.g. deleting temporary data files.
+The `trap` command calls the `cleanup_script` function whenever the script exits, whether it finishes normally, fails on a command (via `set -e`), or calls `exit_script`. SIGINT and SIGTERM are trapped separately so that they stop the script with exit code 130 or 143 (128 plus the signal number); the exit then runs `cleanup_script`. Without this, bash would run the cleanup and then carry on with the next command. For the template, the function simply deletes the directory created for the script lock. However, for complex scripts, additional tasks can be added, e.g. deleting temporary data files.
 
 ### Exiting the Script Gracefully
 Calls to the `exit_script` function will exit the script with the exit code passed as the first script argument. If a message is provided as a second argument, the message will be printed to stderr.

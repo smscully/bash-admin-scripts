@@ -35,7 +35,7 @@ If the script runs without an error, `main` invokes the `exit_script` function, 
 
 If the script errors out on a Bash command, the command's exit code will return. 
 
-As a final step, upon receiving a SIGINT, SIGTERM, ERR, or EXIT signal, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock. 
+If the script is stopped by SIGINT or SIGTERM, it exits with code 130 or 143 respectively. As a final step, whenever the script exits, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock. 
 
 ## Getting Started
 

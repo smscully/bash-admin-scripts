@@ -50,14 +50,11 @@ function lock_script() {
 }
 
 ########################################
-# Clean up tasks, such as deleting temp resources
+# Clean up tasks, such as deleting temp resources. Runs from the EXIT trap.
 # Arguments:
 #   None
 ########################################
 function cleanup_script(){
-  # Disable trap handler to avoid recursion
-  trap - SIGINT SIGTERM ERR EXIT
-
   if [[ -d "${script_lock}" ]]; then
     /usr/bin/rmdir "${script_lock}"
   fi 
@@ -202,7 +199,11 @@ function update_distro() {
 #   $@ (required): Positional parameters passed to script 
 ########################################
 function main() {
-  trap cleanup_script SIGINT SIGTERM ERR EXIT
+  # Clean up on every exit, including errors caught by 'set -e'.
+  # A signal must also stop the script, so exit with 128 + signal number.
+  trap cleanup_script EXIT
+  trap 'exit 130' SIGINT
+  trap 'exit 143' SIGTERM
 
   init_script "${@}"
   check_root
