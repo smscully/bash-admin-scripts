@@ -23,6 +23,7 @@ function init_script(){
   readonly ERR_INV_OPT=50         # Invalid script option
   readonly ERR_LOCK=51            # Unable to lock script
   readonly ERR_ROOT_PRIV=52       # Root privileges required
+  readonly ERR_DISTRO=54          # Unsupported or unknown distribution
 
   # Global variables
   lock_fd=""
@@ -175,36 +176,96 @@ function check_root() {
 }
 
 ########################################
+# Determine the package manager family from an os-release file. Reads the
+# ID and ID_LIKE fields exactly (the file is not sourced), trying ID first
+# and then each ID_LIKE entry in order.
+# Arguments:
+#   $1 (required): Path to the os-release file
+# Outputs:
+#   Writes one of rhel, arch, debian or suse to stdout
+# Returns:
+#   0 if the distribution is recognized, 1 otherwise
+########################################
+function detect_distro() {
+  local os_release="$1"
+  local candidate
+  local candidates=()
+  local id=""
+  local id_like=""
+  local key
+  local value
+
+  if [[ ! -r "${os_release}" ]]; then
+    return 1
+  fi
+
+  while IFS='=' read -r key value || [[ -n "${key}" ]]; do
+    # Strip optional surrounding quotes
+    value="${value#[\"\']}"
+    value="${value%[\"\']}"
+    case "${key}" in
+      ID) id="${value}" ;;
+      ID_LIKE) id_like="${value}" ;;
+    esac
+  done < "${os_release}"
+
+  read -r -a candidates <<< "${id} ${id_like}"
+  for candidate in "${candidates[@]}"; do
+    case "${candidate}" in
+      rhel | centos | fedora | rocky)
+        echo "rhel"
+        return 0
+        ;;
+      arch)
+        echo "arch"
+        return 0
+        ;;
+      debian | ubuntu | linuxmint)
+        echo "debian"
+        return 0
+        ;;
+      suse | opensuse | opensuse-* | sles)
+        echo "suse"
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+########################################
 # Determine Linux distribution and run appropriate update commands
 # Arguments:
-#   None 
+#   $1 (required): Path to the os-release file
 # Ouputs:
 #   Writes command output to stdout
 ########################################
 function update_distro() {
-  # RHEL
-  if [[ $(grep -Ei "rhel|centos|fedora|rocky" "${OS_RELEASE}") ]]; then
-    if [[ $(command -v dnf) ]]; then
-      dnf -y update
-    else
-      yum -y update
-    fi
-  fi	
+  local family
 
-  # Arch
-  if [[ $(grep -Ei "arch" "${OS_RELEASE}") ]]; then
-    pacman -Syu --noconfirm
-  fi	
+  if ! family="$(detect_distro "$1")"; then
+    exit_script "${ERR_DISTRO}" "${red}Unsupported or unknown distribution (checked ID and ID_LIKE in $1).${noformat}"
+  fi
 
-  # Debian
-  if [[ $(grep -Ei "debian|ubuntu|mint" "${OS_RELEASE}") ]]; then
-    apt-get -y update && apt-get -y upgrade
-  fi	
-
-  #  SUSE
-  if [[ $(grep -Ei "suse|opensuse" "${OS_RELEASE}") ]]; then
-    zypper -n update
-  fi	
+  case "${family}" in
+    rhel)
+      if command -v dnf > /dev/null; then
+        dnf -y update
+      else
+        yum -y update
+      fi
+      ;;
+    arch)
+      pacman -Syu --noconfirm
+      ;;
+    debian)
+      apt-get -y update
+      apt-get -y upgrade
+      ;;
+    suse)
+      zypper -n update
+      ;;
+  esac
 }
 
 ########################################
@@ -224,7 +285,7 @@ function main() {
   unset_colors 
   check_root
   lock_script
-  update_distro
+  update_distro "${OS_RELEASE}"
   exit_script 0 ""
 }
 
