@@ -32,11 +32,14 @@ function init_script(){
   backup_freq=""
   script_lock=""
   no_color="false"
-  noformat=$'\033[0;0m'
-  red=$'\033[0;31m'
-  green=$'\033[0;32m'
-  yellow=$'\033[0;33m'
-  blue=$'\033[0;34m'
+
+  # Text colors: only when stdout and stderr are terminals and NO_COLOR is unset
+  noformat=""
+  red=""
+  if [[ -t 1 && -t 2 && -z "${NO_COLOR:-}" ]]; then
+    noformat=$'\033[0;0m'
+    red=$'\033[0;31m'
+  fi
 }
 
 ########################################
@@ -139,9 +142,6 @@ function parse_params() {
 #   no_color
 #   noformat
 #   red
-#   green
-#   yellow
-#   blue
 # Arguments:
 #   None
 ########################################
@@ -149,9 +149,6 @@ function unset_colors() {
   if [[ "${no_color}" == "true" ]]; then
     noformat=""
     red=""
-    green=""
-    yellow=""
-    blue=""
   fi 
 }
 

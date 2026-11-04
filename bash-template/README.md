@@ -15,7 +15,7 @@ The `set -Eeuo pipefail` statement configures the script execution options:
 The Bash Builtins man page provides an in-depth explanation of these options, as does this excellent [blog post](https://vaneyckt.io/posts/safer_bash_scripts_with_set_euxo_pipefail/).
 
 ### Initializing Script Variables
-All constants, exit codes, and global variables are initialized in the `init_script` function. This includes the color variables because the default state for text color is true.
+All constants, exit codes, and global variables are initialized in the `init_script` function. This includes the color variables.
 
 ### Locking the Script
 There are several methods to ensure only one instance of a script is running. (For a detailed explanation of the most common techniques, read [this article](https://www.baeldung.com/linux/bash-ensure-instance-running).) In the template, the `lock_script` function creates a temporary directory to indicate the script is in use, then removes the directory once the script completes.
@@ -36,7 +36,9 @@ Next, a `while` loop with a `shift` statement cycles through the parameters, usi
 Presently, the template parses options but not arguments. To modify the `parse_params` function to include arguments, review this [post](https://medium.com/@Drew_Stokes/bash-argument-parsing-54f3b81a6a8f) by Drew Stokes, which provides an excellent explanation of how to parse options with their arguments.
 
 ### Text Colors
-By default, text colors are set to true, as the `init_script` function assigns color variables and sets the global variable `no_color` to false. Running the script with the -n or --no-color option resets `no_color` to true, and the `unset_colors` function will then reset the color variables to null values.
+Text colors are turned on only when both stdout and stderr are terminals and the [`NO_COLOR`](https://no-color.org/) environment variable is unset, so logs and cron mail do not get raw escape sequences. The `init_script` function makes that check and sets the color variables. Running the script with the -n or --no-color option sets `no_color` to true, and the `unset_colors` function then resets the color variables to empty values.
+
+The template defines only `red`, since that is the only color it uses. Define others the same way (for example `green=$'\033[0;32m'`) inside the same check.
 
 In the template, the only use of color is by the `exit_script` function, which prints color-formatted error messages to stderr. Color functionality, though, can be added to other print statements as needed. Doing so is as simple as adding a color tag (e.g., `${red}`) at the beginning of the text and a noformat tag (`${noformat}`) after the text. The following call to `exit_script` provides an example:
 
