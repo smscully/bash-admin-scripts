@@ -32,6 +32,7 @@ function init_script(){
   backup_del=""
   backup_freq=""
   lock_fd=""
+  partial_archive=""
   no_color="false"
 
   # Text colors: only when stdout and stderr are terminals and NO_COLOR is unset
@@ -78,9 +79,11 @@ function lock_script() {
 #   None
 ########################################
 function cleanup_script(){
-  # The script lock is released automatically on exit. Add other tasks
-  # here, such as deleting temporary files.
-  :
+  # The script lock is released automatically on exit. Remove an archive
+  # left unfinished by a failed or interrupted run.
+  if [[ -n "${partial_archive:-}" && -f "${partial_archive}" ]]; then
+    rm -f -- "${partial_archive}"
+  fi
 }
 
 ########################################
@@ -214,7 +217,10 @@ EOF
 #   None
 ########################################
 backup() {
+  local archive_dir=""
   local line=""
+  local remote_dir=""
+  local remote_prune=""
   local tar_archive="backup-$(date +%Y-%m-%d-%H-%M-%S).tgz"
   local tar_files=()
   local save_dir_local=""
@@ -288,18 +294,34 @@ backup() {
     exit_script "${ERR_SETTINGS}" "${red}SSH key under --SSH_KEY-- is missing or not readable: ${ssh_key}${noformat}"
   fi
 
-  # Create tar archive with gzip compression
-  tar -zcf "${save_dir_local}/${backup_freq}/${tar_archive}" -C / "${tar_files[@]}"
+  archive_dir="${save_dir_local}/${backup_freq}"
+  remote_dir="${save_dir_remote%/}/${backup_freq}"
+
+  # Create tar archive with gzip compression. Write it under a .partial name
+  # and rename it once complete, so a failed run never leaves a truncated
+  # archive that looks finished (cleanup_script removes the partial file).
+  partial_archive="${archive_dir}/${tar_archive}.partial"
+  tar -zcf "${partial_archive}" -C / "${tar_files[@]}"
+  mv -- "${partial_archive}" "${archive_dir}/${tar_archive}"
+  partial_archive=""
 
   # Delete older archives based on frequency. Only this script's own
   # archives are matched; both path parts were checked as non-empty above.
-  find "${save_dir_local}/${backup_freq}" -type f -name 'backup-*.tgz' -mtime +"${backup_del}" -delete
+  find "${archive_dir}" -type f -name 'backup-*.tgz' -mtime +"${backup_del}" -delete
 
-  # Copy archive to remote SSH and delete extraneous 
-  rsync -e "ssh -i ${ssh_key}" -a --delete "${save_dir_local}/${backup_freq}" "${ssh_server}:${save_dir_remote}"
+  # Copy new archives to the remote server. There is no --delete, and
+  # --ignore-existing never overwrites a remote file, so archives deleted or
+  # altered locally (for example by ransomware) do not spread to the remote.
+  rsync -e "ssh -i \"${ssh_key}\"" -a --ignore-existing --exclude='*.partial' \
+    "${archive_dir}" "${ssh_server}:${save_dir_remote}"
 
-  printf 'The tar archive %s was created and saved to the remote backup location at: %s:%s/%s\n' \
-    "${tar_archive}" "${ssh_server}" "${save_dir_remote}" "${backup_freq}"
+  # Expire old archives on the remote with the same retention as locally.
+  # rsync -a keeps each archive's mtime, so the ages match.
+  remote_prune="find $(printf '%q' "${remote_dir}") -type f -name 'backup-*.tgz' -mtime +${backup_del} -delete"
+  ssh -i "${ssh_key}" "${ssh_server}" "${remote_prune}"
+
+  printf 'The tar archive %s was created and saved to the remote backup location at: %s:%s\n' \
+    "${tar_archive}" "${ssh_server}" "${remote_dir}"
 }
 
 ########################################
