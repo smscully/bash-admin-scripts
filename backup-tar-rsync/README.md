@@ -30,7 +30,7 @@ If the script runs without an error, `main` invokes the `exit_script` function, 
 |---------|-----------|
 |50|Invalid script option or unexpected argument|
 |51|Unable to lock script|
-|52|Incorrect number of parameters|
+|52|Missing frequency option, or more than one|
 |54|Missing or invalid `backup.settings` value|
 
 If the script errors out on a Bash command, the command's exit code will return. 
@@ -103,7 +103,7 @@ As an example, to schedule a weekly backup at 12:30 a.m. every Sunday, create th
 ```
 
 ## Usage
-The script requires at least one of the following options:
+The script requires exactly one frequency option (or -h). The available options are:
 
 |Short Option|Long Option|Description|
 |---------|---------|-----------|
@@ -123,8 +123,7 @@ sudo ./backup-tar-rsync.sh -w -v
 However, please note the following caveats:
 
 + The script exits after displaying help, and calls the `usage` function before the `backup` function. As such, if both help and backup options are provided, only help will run.
-+ Only one backup option is processed. If multiple backup options are provided, only the last will take effect. 
-+ The script will throw an error if neither a frequency option (-d, -m, -o, -w) nor the help option (-h) is provided.
++ Exactly one frequency option (-d, -m, -o, -w) must be provided, unless the help option (-h) is used. With no frequency option, or more than one, the script exits with code 52.
 
 ## License
 Licensed under the [GNU General Public License v3.0](../LICENSE).

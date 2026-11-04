@@ -105,11 +105,7 @@ function exit_script() {
 ########################################
 function parse_params() {
   local param
-
-  # If no parameters passed, exit
-  if [[ "$#" -eq 0 ]]; then
-    exit_script "${ERR_NUM_PARAMS}" "${red}Incorrect number of parameters. Please use the -h option to view Help.${noformat}"
-  fi
+  local freq_count=0
 
   while [[ $# -gt 0 ]];do
     param="$1"
@@ -118,6 +114,7 @@ function parse_params() {
       -d | --daily)
         backup_freq="daily"
         backup_del=7
+        freq_count=$((freq_count + 1))
         ;;
       -h | --help)
         usage
@@ -125,6 +122,7 @@ function parse_params() {
       -m | --monthly)
         backup_freq="monthly"
         backup_del=365
+        freq_count=$((freq_count + 1))
         ;;
       -n | --no-color)
         no_color="true"
@@ -132,6 +130,7 @@ function parse_params() {
       -o | --once)
         backup_freq="once"
         backup_del=0
+        freq_count=$((freq_count + 1))
         ;;
       -v | --verbose)
         PS4='$LINENO:'
@@ -140,6 +139,7 @@ function parse_params() {
       -w | --weekly)
         backup_freq="weekly"
         backup_del=30
+        freq_count=$((freq_count + 1))
         ;;
       -*)
         exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param}. Please use the -h option to view Help.${noformat}"
@@ -149,6 +149,11 @@ function parse_params() {
         ;;
     esac
   done
+
+  # Exactly one frequency option is required (-h exits above, inside usage)
+  if [[ "${freq_count}" -ne 1 ]]; then
+    exit_script "${ERR_NUM_PARAMS}" "${red}Exactly one frequency option (-d, -w, -m or -o) is required. Please use the -h option to view Help.${noformat}"
+  fi
 }
 
 ########################################
