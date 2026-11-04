@@ -19,7 +19,7 @@ The `main` function first calls the following utility functions:
 + `parse_params`: parses parameters provided by the user, assigning values and calling functions such as `usage` for script help.
 + `unset_colors`: determines text color settings.
 + `check_root`: checks for root privileges and exits on failure. This runs after `parse_params`, so `--help` works without root.
-+ `lock_script`: initiates a script lock.
++ `lock_script`: initiates a script lock, so only one instance runs at a time.
 
 ### 2. Core Script Function: `update_distro`
 Once the script is successfully locked, indicating that only one instance of the script is running, `main` proceeds to the core script function, `update_distro`. This function determines the distribution via a set of conditionals that test grep searches of the `/etc/os-release` file. Each conditional searches for distribution-specific keywords. Once a conditional returns true, the script runs the distribution-specific package manager update commands.
@@ -35,7 +35,7 @@ If the script runs without an error, `main` invokes the `exit_script` function, 
 
 If the script errors out on a Bash command, the command's exit code will return. 
 
-If the script is stopped by SIGINT or SIGTERM, it exits with code 130 or 143 respectively. As a final step, whenever the script exits, the `trap` command calls the `cleanup_script` function, which deletes the directory created for the script lock. 
+If the script is stopped by SIGINT or SIGTERM, it exits with code 130 or 143 respectively. As a final step, whenever the script exits, the `trap` command calls the `cleanup_script` function. The script lock is held with `flock` (in `/run` when running as root, otherwise in `$XDG_RUNTIME_DIR` or `/tmp`) and is released automatically when the script exits. 
 
 ## Getting Started
 

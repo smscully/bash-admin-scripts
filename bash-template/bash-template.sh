@@ -25,7 +25,7 @@ function init_script(){
   readonly ERR_ROOT_PRIV=53       # Root privileges required
 
   # Global variables
-  script_lock=""
+  lock_fd=""
   no_color="false"
 
   # Text colors: only when stdout and stderr are terminals and NO_COLOR is unset
@@ -43,11 +43,25 @@ function init_script(){
 #   None
 ########################################
 function lock_script() {
-  local lock_dir="/tmp/${SCRIPT_NAME}.lock"
+  local lock_dir
+  local lock_file
 
-  if /usr/bin/mkdir "${lock_dir}"; then
-    script_lock="${lock_dir}"
+  # Root uses /run, which only root can write. Other users use their private
+  # runtime directory, falling back to /tmp (for example under cron).
+  if [[ "${EUID}" -eq 0 ]]; then
+    lock_dir="/run"
   else
+    lock_dir="${XDG_RUNTIME_DIR:-/tmp}"
+  fi
+  if [[ ! -d "${lock_dir}" || ! -w "${lock_dir}" ]]; then
+    lock_dir="/tmp"
+  fi
+  lock_file="${lock_dir}/${SCRIPT_NAME}.lock"
+
+  # flock holds the lock on an open file descriptor. The kernel releases it
+  # when the script exits, even after kill -9, so a stale lock cannot block
+  # the next run.
+  if ! { exec {lock_fd}>>"${lock_file}"; } 2>/dev/null || ! flock -n "${lock_fd}"; then
     exit_script "${ERR_LOCK}" "${red}Script lock could not be acquired. Please close other instances of the script, then rerun.${noformat}"
   fi
 }
@@ -58,9 +72,9 @@ function lock_script() {
 #   None
 ########################################
 function cleanup_script(){
-  if [[ -d "${script_lock}" ]]; then
-    /usr/bin/rmdir "${script_lock}"
-  fi 
+  # The script lock is released automatically on exit. Add other tasks
+  # here, such as deleting temporary files.
+  :
 }
 
 ########################################
