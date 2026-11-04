@@ -29,7 +29,7 @@ If the script runs without an error, `main` invokes the `exit_script` function, 
 
 |Exit Code|Description|
 |---------|-----------|
-|50|Invalid script option|
+|50|Invalid script option or unexpected argument|
 |51|Unable to lock script|
 |52|Root privileges required|
 

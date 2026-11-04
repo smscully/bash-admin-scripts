@@ -104,8 +104,11 @@ function parse_params() {
         PS4='$LINENO:'
         set -x
         ;;
-      -* | --*) 
+      -*)
         exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param}. Please use the -h option to view Help.${noformat}"
+        ;;
+      *)
+        exit_script "${ERR_INV_OPT}" "${red}Unexpected argument: ${param}. Please use the -h option to view Help.${noformat}"
         ;;
     esac
   done

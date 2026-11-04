@@ -123,8 +123,11 @@ function parse_params() {
         backup_freq="weekly"
         backup_del=30
         ;;
-      -*) 
+      -*)
         exit_script "${ERR_INV_OPT}" "${red}Invalid option: ${param}. Please use the -h option to view Help.${noformat}"
+        ;;
+      *)
+        exit_script "${ERR_INV_OPT}" "${red}Unexpected argument: ${param}. Please use the -h option to view Help.${noformat}"
         ;;
     esac
   done
