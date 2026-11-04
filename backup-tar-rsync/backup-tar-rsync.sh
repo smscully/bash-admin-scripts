@@ -255,13 +255,13 @@ backup() {
   done < $SETTINGS_FILE
 
   # Create tar archive with gzip compression
-  /usr/bin/tar -zcf "${save_dir_local}/${backup_freq}/${tar_archive}" -C / "${tar_files[@]}"
+  tar -zcf "${save_dir_local}/${backup_freq}/${tar_archive}" -C / "${tar_files[@]}"
 
   # Delete older archives based on frequency
-  /usr/bin/find ${save_dir_local}/${backup_freq} -type f -mtime +"${backup_del}" -delete
+  find ${save_dir_local}/${backup_freq} -type f -mtime +"${backup_del}" -delete
 
   # Copy archive to remote SSH and delete extraneous 
-  /usr/bin/rsync -e "ssh -i ${ssh_key}" -a --delete "${save_dir_local}/${backup_freq}" "${ssh_server}:${save_dir_remote}"
+  rsync -e "ssh -i ${ssh_key}" -a --delete "${save_dir_local}/${backup_freq}" "${ssh_server}:${save_dir_remote}"
 
   printf 'The tar archive %s was created and saved to the remote backup location at: %s:%s/%s\n' \
     "${tar_archive}" "${ssh_server}" "${save_dir_remote}" "${backup_freq}"

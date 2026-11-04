@@ -185,25 +185,25 @@ function update_distro() {
   # RHEL
   if [[ $(grep -Ei "rhel|centos|fedora|rocky" "${OS_RELEASE}") ]]; then
     if [[ $(command -v dnf) ]]; then
-      /usr/bin/dnf -y update
+      dnf -y update
     else
-      /usr/bin/yum -y update
+      yum -y update
     fi
   fi	
 
   # Arch
   if [[ $(grep -Ei "arch" "${OS_RELEASE}") ]]; then
-    /usr/bin/pacman -Syu --noconfirm
+    pacman -Syu --noconfirm
   fi	
 
   # Debian
   if [[ $(grep -Ei "debian|ubuntu|mint" "${OS_RELEASE}") ]]; then
-    /usr/bin/apt-get -y update && /usr/bin/apt-get -y upgrade
+    apt-get -y update && apt-get -y upgrade
   fi	
 
   #  SUSE
   if [[ $(grep -Ei "suse|opensuse" "${OS_RELEASE}") ]]; then
-    /usr/bin/zypper -n update
+    zypper -n update
   fi	
 }
 
